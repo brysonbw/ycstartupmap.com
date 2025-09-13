@@ -10,7 +10,7 @@ export type UserAgent =
   | 'unknown';
 
 export class AppStore extends EventTarget {
-  public readonly VISITED_STORAGE_KEY = `${import.meta.env.VITE_APP_TITLE.toLowerCase().replaceAll(' ', '-')}-visited`;
+  public readonly VISITED_STORAGE_KEY = `${import.meta.env.VITE_APP_TITLE?.toLowerCase()?.replaceAll(' ', '-')}-visited`;
   private _webGLEnabled = false;
   private _userAgent: UserAgent = 'unknown';
   private _hasUserVisited: boolean = true;
