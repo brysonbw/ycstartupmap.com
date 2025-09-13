@@ -77,11 +77,11 @@ export function detectUserAgent(): UserAgent {
  * @param size
  * @param bgColor
  */
-export function getPlaceholderImage(
+export async function getPlaceholderImage(
   text: string,
   size: number = DEFAULT_BILLBOARD_IMAGE_SIZE,
   bgColor: string = COLOR_PALETTE.orange
-): string {
+): Promise<string> {
   const scale = 2;
   const canvas = document.createElement('canvas');
   canvas.width = size * scale;
