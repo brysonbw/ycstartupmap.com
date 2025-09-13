@@ -1,0 +1,57 @@
+name: 'CI'
+
+on:
+  push:
+    branches:
+      - '*'
+      - '*/*'
+      - '**'
+  pull_request:
+    branches:
+      - '*'
+      - '*/*'
+      - '**'
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x, 24.x]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v46
+      - name: List all changed files
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo "$file was changed"
+          done
+      - name: Check changes
+        id: changed-ignored
+        uses: tj-actions/changed-files@v46
+        with:
+          files: |
+            **.md
+            .github/**
+            src/data/**/*.json
+            .env.example
+      - name: Setup node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+        if: steps.changed-ignored.outputs.only_modified == 'false'
+      - run: npm ci
+        if: steps.changed-ignored.outputs.only_modified == 'false'
+      - run: npm run lint && npm run test
+        if: steps.changed-ignored.outputs.only_modified == 'false'
+      - run: echo "✅ Lint and tests completed successfully on Node.js ${{ matrix.node-version }}!"

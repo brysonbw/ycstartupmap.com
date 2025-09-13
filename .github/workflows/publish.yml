@@ -1,0 +1,40 @@
+name: Publish
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+      - 'v**'
+  workflow_dispatch:
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.head.label == 'yc-startup-map:release')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: 'Release PR info'
+        if: github.event_name != 'workflow_dispatch'
+        run: echo "PR ${{ github.event.number }}"
+      - uses: actions/checkout@v5
+      - name: git config
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+      - name: Publish packages with Changesets
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: npm run changeset:publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Show publish info
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          echo "YC Startup Map v${{ steps.changesets.outputs.new-version }} has been published!"

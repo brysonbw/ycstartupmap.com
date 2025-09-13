@@ -1,0 +1,65 @@
+'pr::docs':
+  - changed-files:
+      - any-glob-to-any-file: '**.md'
+
+'pr::code':
+  - changed-files:
+      - any-glob-to-any-file: ['src/**/*.js', 'src/**/*.ts']
+
+'pr::types':
+  - changed-files:
+      - any-glob-to-any-file: ['src/types/**/*.ts']
+
+'pr::cesium':
+  - changed-files:
+      - any-glob-to-any-file:
+          ['src/components/cesium/**', 'src/assets/img/**', 'src/data/**']
+
+'pr::changeset':
+  - changed-files:
+      - any-glob-to-any-file: ['.changeset/**']
+
+'pr::config':
+  - changed-files:
+      - any-glob-to-any-file:
+          [
+            'eslint.config.js',
+            '.prettierrc.json',
+            '.prettierignore',
+            'vite-end.d.ts',
+            '.npmrc',
+            '.gitignore',
+            '.changeset/**',
+          ]
+
+'pr::vite':
+  - changed-files:
+      - any-glob-to-any-file: ['vite-end.d.ts', 'vite.config.js']
+
+'pr::tests':
+  - changed-files:
+      - any-glob-to-any-file:
+          [
+            'tests/**.js',
+            'tests/**.ts',
+            '**/*.test.js',
+            '**/*.test.ts',
+            'src/testing/**',
+          ]
+
+'pr::github':
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+'pr::ci':
+  - changed-files:
+      - any-glob-to-any-file: ['tsconfig.json', 'vite.config.js']
+
+'pr::feature':
+  - head-branch: ['feature', 'feat', 'enhancement', 'add']
+
+'pr::patch':
+  - head-branch: ['update', 'edit']
+
+'pr::fix':
+  - head-branch: ['fix', 'bug']
