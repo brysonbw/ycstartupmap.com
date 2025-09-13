@@ -851,13 +851,12 @@ export class CesiumViewer extends LitElement {
           !!item.location?.latitude && !!item.location?.longitude;
         const hasLogo = Boolean(item.logo);
         const image = hasLogo
-          ? new URL(`../assets/img/logos/${item.logo}.png`, import.meta.url)
-              .href
-          : getPlaceholderImage(item.name ?? '?');
+          ? `logos/${item.logo}.png`
+          : await getPlaceholderImage(item.name ?? '?');
 
         for (const founder of item.founders) {
           if (!founder.avatar) {
-            founder.avatar = getPlaceholderImage(founder.name ?? '?');
+            founder.avatar = await getPlaceholderImage(founder.name ?? '?');
             founder.has_placeholder_avatar = true;
           }
         }

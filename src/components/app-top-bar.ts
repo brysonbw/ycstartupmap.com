@@ -16,7 +16,9 @@ export class AppTopBar extends LitElement {
           />
           <p class="app-title" aria-current="page">
             Startup Map
-            ${import.meta.env.DEV ? html`<span>[DEV]</span>` : nothing}
+            ${import.meta.env.MODE === 'development'
+              ? html`<span>[DEV]</span>`
+              : nothing}
           </p>
         </div>
 
