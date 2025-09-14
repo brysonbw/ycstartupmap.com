@@ -28,7 +28,7 @@
     "Bryson Ward (https://github.com/brysonbw)"
   ],
   "dependencies": {
-    "@lit-labs/router": "^0.1.4",
+    "@vaadin/router": "^2.0.0",
     "cesium": "^1.133.1",
     "lit": "^3.3.1",
     "lit-toaster": "^0.2.1",

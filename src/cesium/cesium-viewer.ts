@@ -1,3 +1,4 @@
+import { Router } from '@vaadin/router';
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import fullScreenIcon from '../assets/svg/fullscreen.svg';
@@ -798,6 +799,7 @@ export class CesiumViewer extends LitElement {
     try {
       //! WebGL not enabled
       if (!appStore.webGLEnabled) {
+        Router.go('/webgl-error');
         throw new Error(
           'Could not load map. Browser or device may not support WebGL.'
         );
