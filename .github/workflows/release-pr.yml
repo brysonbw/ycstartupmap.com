@@ -1,16 +1,6 @@
 name: Release PR
 on:
   workflow_dispatch:
-    inputs:
-      type:
-        description: 'Release type'
-        required: true
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
 jobs:
   release-pr:
     runs-on: ubuntu-latest
@@ -25,11 +15,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Bump package version with Changesets
-        run: npm run changeset:version -- --release-type ${{ github.event.inputs.type }}
+        run: npm run changeset:version
       - name: Get npm version
         id: package-version
         uses: martinbeentjes/npm-get-version-action@main
