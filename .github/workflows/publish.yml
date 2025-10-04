@@ -23,18 +23,21 @@ jobs:
         run: |
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-      - uses: actions/setup-node@v5
+      - name: Get npm version
+        id: package-version
+        uses: martinbeentjes/npm-get-version-action@main
+      - name: Create Git tag
+        run: |
+          VERSION=v${{ steps.package-version.outputs.version }}
+          git tag $VERSION
+          git push origin $VERSION
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-      - name: Publish packages with Changesets
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          publish: npm run changeset:publish
+          tag_name: v${{ steps.package-version.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Show publish info
-        if: steps.changesets.outputs.published == 'true'
+      - name: Show release info
         run: |
-          echo "YC Startup Map v${{ steps.changesets.outputs.new-version }} has been published!"
+          echo "YC Startup Map v${{ steps.package-version.outputs.version }} published!"
+
