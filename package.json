@@ -19,8 +19,7 @@
     "lint": "eslint . --ext .js",
     "format": "prettier --write .",
     "changeset": "npx @changesets/cli",
-    "changeset:version": "npx @changesets/cli version",
-    "changeset:publish": "npx @changesets/cli publish"
+    "changeset:version": "npx @changesets/cli version"
   },
   "author": "Bryson Ward",
   "license": "Apache-2.0",
