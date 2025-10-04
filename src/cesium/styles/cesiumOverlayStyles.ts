@@ -1,5 +1,6 @@
 import { css } from 'lit';
 
+/** Cesium overlay styles */
 export const cesiumOverlayStyles = css`
   div[slot='overlay-top-right'] button,
   div[slot='overlay-bottom-left'] button,
