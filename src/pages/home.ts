@@ -260,55 +260,35 @@ export class HomePage extends LitElement {
         <div class="entities-list">
           ${this._entitiesList.length
             ? html`${this._entitiesList.map(
-                (entity: PropertyBag | undefined) => html`
-                  ${entity?.hasLocation.getValue()
-                    ? html`<div class="tooltip tooltip-top">
-                        <div
-                          role="button"
-                          tabindex="0"
-                          aria-pressed="false"
-                          class="entity-item-card"
-                          @click=${(): void => this._onFlyToEntity(entity?.id)}
-                        >
-                          <span class="thumbnail">
-                            <img
-                              src=${entity?.logoImage}
-                              alt="${entity?.name} logo"
-                            />
-                          </span>
-                          <div class="company-info">
-                            <p class="name">${entity?.name}</p>
-                            ${entity?.region.getValue()
-                              ? html` <p class="location">${entity?.region}</p>`
-                              : nothing}
-                            <p class="description">${entity?.description}</p>
-                          </div>
-                        </div>
-                        <span class="tooltiptext">Fly to ${entity.name} </span>
-                      </div>`
-                    : html`<div class="tooltip tooltip-top">
-                        <div
-                          role="button"
-                          tabindex="0"
-                          aria-pressed="false"
-                          class="entity-item-card unplotted"
-                        >
-                          <span class="thumbnail">
-                            <img
-                              src=${entity?.logoImage}
-                              alt="${entity?.name} logo"
-                            />
-                          </span>
-                          <div class="company-info">
-                            <p class="name">${entity?.name}</p>
-                            <p class="description">${entity?.description}</p>
-                          </div>
-                        </div>
-                        <span class="tooltiptext truncate"
-                          >${entity?.name}
-                        </span>
-                      </div>`}
-                `
+                (entity: PropertyBag | undefined) =>
+                  html` <div class="tooltip tooltip-top">
+                    <div
+                      role="button"
+                      tabindex="0"
+                      aria-pressed="false"
+                      class="entity-item-card"
+                      @click=${(): void => this._onEntityItemClick(entity)}
+                    >
+                      <span class="thumbnail">
+                        <img
+                          src=${entity?.logoImage}
+                          alt="${entity?.name} logo"
+                        />
+                      </span>
+                      <div class="company-info">
+                        <p class="name">${entity?.name}</p>
+                        ${entity?.region.getValue()
+                          ? html` <p class="location">${entity?.region}</p>`
+                          : nothing}
+                        <p class="description">${entity?.description}</p>
+                      </div>
+                    </div>
+                    <span class="tooltiptext"
+                      >${entity?.hasLocation.getValue()
+                        ? `Fly to ${entity.name} 📍`
+                        : `${entity?.name}`}</span
+                    >
+                  </div>`
               )}`
             : html`${this._emptyEntitesListPlaceholderTemplate()}`}
         </div>`;
@@ -446,17 +426,30 @@ export class HomePage extends LitElement {
   }
 
   /**
-   * OnClick `Fly To` plotted entity [yc company] - dispatch `fly-to-entity` event to `<cesium-viewer>` component (element) to handle action
-   * @param entityId
+   *  Handle entity item onClick - dispatch `fly-to-entity` or `show-entity-item-detail-popover` event (depending on whether entity has location or not)
+   * @param entity
    */
-  private _onFlyToEntity(entityId: number): void {
-    this._cesiumViewerEl.dispatchEvent(
-      new CustomEvent(CESIUM_VIEWER_EVENT.FLY_TO_ENTITY, {
-        detail: entityId,
-        bubbles: true,
-        composed: true,
-      })
-    );
+  private _onEntityItemClick(entity?: PropertyBag): void {
+    if (!entity) return;
+    const entityId = entity?.id;
+
+    if (entity?.hasLocation.getValue()) {
+      this._cesiumViewerEl.dispatchEvent(
+        new CustomEvent(CESIUM_VIEWER_EVENT.FLY_TO_ENTITY, {
+          detail: entityId,
+          bubbles: true,
+          composed: true,
+        })
+      );
+    } else {
+      this._cesiumViewerEl.dispatchEvent(
+        new CustomEvent(CESIUM_VIEWER_EVENT.SHOW_ENTITY_ITEM_DETAIL_POPOVER, {
+          detail: entityId,
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
   }
 
   /** Empty entities list placeholder */

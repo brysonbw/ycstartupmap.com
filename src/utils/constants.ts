@@ -41,6 +41,7 @@ export const HOME_CAMERA_COORDINATES = Object.freeze({
  * @property {string} ENTITY_LABELS_CHANGE
  * @property {string} MAP_OVERLAYS_CHANGE
  * @property {string} FLY_TO_ENTITY
+ * @property {string} SHOW_ENTITY_ITEM_DETAIL_POPOVER
  */
 export const CESIUM_VIEWER_EVENT = Object.freeze({
   /** Dispatched after attempt to load cesium finished. Event detail (`event.detail`) contains the return value (true or false) from `loadCesium()` specifying if loading map was success or fail */
@@ -61,4 +62,6 @@ export const CESIUM_VIEWER_EVENT = Object.freeze({
   MAP_OVERLAYS_CHANGE: 'map-overlays-change',
   /** Dispatched onClick for entity list/card button. Event detail (`event.detail`) contains the entity ID of the entity as a number */
   FLY_TO_ENTITY: 'fly-to-entity',
+  /** Dispatched onClick for entity list/card button that isn't plotted. Event detail (`event.detail`) contains the entity ID of the entity as a number */
+  SHOW_ENTITY_ITEM_DETAIL_POPOVER: 'show-entity-item-detail-popover',
 });
