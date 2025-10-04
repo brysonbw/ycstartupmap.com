@@ -3,8 +3,8 @@ import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import fullScreenIcon from '../assets/svg/fullscreen.svg';
 import fullScreenExitIcon from '../assets/svg/fullscreen-exit.svg';
-import { appStore, type UserAgent } from '../stores/app';
-import type { Founder, WebPlatform, YCCompany } from '../types/ycCompany';
+import { appStore } from '../stores/app';
+import type { YCCompany } from '../types/ycCompany';
 import { toast } from 'lit-toaster';
 import { tooltipStyles } from '../shared/styles/tooltipStyles';
 import { truncateTextStyles } from '../shared/styles/truncateTextStyles';
@@ -20,48 +20,16 @@ import {
   MAP_LOADING_MESSAGES,
 } from '../utils/constants';
 import { getPlaceholderImage } from '../utils/helperFunctions';
-
-import crunchbase from '../assets/img/socials/crunchbase.png';
-import facebook from '../assets/img/socials/facebook.png';
-import github from '../assets/img/socials/github.png';
-import linkedin from '../assets/img/socials/linkedin.png';
-import x from '../assets/img/socials/x.png';
-
-import chrome from '../assets/img/browsers/chrome.png';
-import chromium from '../assets/img/browsers/chromium.png';
-import edge from '../assets/img/browsers/edge.png';
-import firefox from '../assets/img/browsers/firefox.png';
-import opera from '../assets/img/browsers/opera.png';
-import safari from '../assets/img/browsers/safari.png';
-import seamonkey from '../assets/img/browsers/seamonkey.png';
-import unknown from '../assets/img/browsers/unknown.png';
+import { getEntityLatLon } from '../utils/cesiumFunctions';
 
 import ycCompaniesData from '../data/yc_companies.json';
-
-import '../shared/loading-indicator';
-import './cesium-overlay';
 
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 
-const SOCIAL_IMAGES: Readonly<Record<string, string>> = Object.freeze({
-  crunchbase,
-  facebook,
-  github,
-  linkedin,
-  x,
-});
-
-const BROWSER_IMAGES: Readonly<Record<UserAgent, string>> = Object.freeze({
-  chrome,
-  chromium,
-  edge,
-  firefox,
-  opera,
-  safari,
-  seamonkey,
-  unknown,
-});
+import '../shared/loading-indicator';
+import './cesium-overlay';
+import './cesium-entity-detail-popover';
 
 @customElement('cesium-viewer')
 export class CesiumViewer extends LitElement {
@@ -91,6 +59,10 @@ export class CesiumViewer extends LitElement {
       this._onFlyToEntity as EventListener
     );
     this.addEventListener(
+      CESIUM_VIEWER_EVENT.SHOW_ENTITY_ITEM_DETAIL_POPOVER,
+      this._onShowEntityItemDetailPopover as EventListener
+    );
+    this.addEventListener(
       CESIUM_VIEWER_EVENT.ENTITY_LABELS_CHANGE,
       this._onEntityLabelsChange as EventListener
     );
@@ -114,6 +86,10 @@ export class CesiumViewer extends LitElement {
     this.removeEventListener(
       CESIUM_VIEWER_EVENT.FLY_TO_ENTITY,
       this._onFlyToEntity as EventListener
+    );
+    this.removeEventListener(
+      CESIUM_VIEWER_EVENT.SHOW_ENTITY_ITEM_DETAIL_POPOVER,
+      this._onShowEntityItemDetailPopover as EventListener
     );
     this.removeEventListener(
       CESIUM_VIEWER_EVENT.ENTITY_LABELS_CHANGE,
@@ -155,9 +131,7 @@ export class CesiumViewer extends LitElement {
             HOME_CAMERA_COORDINATES.height,
             {
               complete: () => {
-                const YC_COORDS = this._getEntityLatLon(
-                  this._ycombinatorEntity
-                );
+                const YC_COORDS = getEntityLatLon(this._ycombinatorEntity);
                 this._flyTo(
                   YC_COORDS?.longitude ?? -122.4215,
                   YC_COORDS?.latitude ?? 37.779,
@@ -220,24 +194,28 @@ export class CesiumViewer extends LitElement {
           this._viewer.selectedEntityChanged.addEventListener(
             (selectedEntity) => {
               // Picked entity defined
-              if (Cesium.defined(selectedEntity)) {
+              if (
+                Cesium.defined(selectedEntity) &&
+                Cesium.defined(selectedEntity.properties) &&
+                'hasLocation' in selectedEntity.properties
+              ) {
                 if (window.innerWidth > 768) {
-                  const positionProperty = selectedEntity.position;
-                  if (!positionProperty) return;
+                  // Setup selected entity detail popover position
+                  const positionProperty = selectedEntity?.position;
+                  let windowPosition: Cesium.Cartesian2 | undefined;
 
-                  const currentPosition = positionProperty.getValue(
-                    Cesium.JulianDate.now()
-                  );
-                  if (!currentPosition) return;
-
-                  // Convert world position to window (pixel) coordinates
-                  const windowPosition =
-                    Cesium.SceneTransforms.worldToWindowCoordinates(
-                      this._viewer!.scene,
-                      currentPosition
+                  if (positionProperty) {
+                    const currentPosition = positionProperty.getValue(
+                      Cesium.JulianDate.now()
                     );
+                    // Convert world position to window (pixel) coordinates
+                    windowPosition =
+                      Cesium.SceneTransforms.worldToWindowCoordinates(
+                        this._viewer!.scene,
+                        currentPosition
+                      );
+                  }
 
-                  // Setup selected entity detail popover
                   if (windowPosition) {
                     const popoverEl = this.renderRoot.querySelector(
                       '#popover'
@@ -291,6 +269,10 @@ export class CesiumViewer extends LitElement {
 
                     this._popoverX = x;
                     this._popoverY = y;
+                  } else {
+                    // Default popover position on medium-large screens
+                    this._popoverX = 262;
+                    this._popoverY = 140;
                   }
                 }
                 this._popoverVisible = true;
@@ -445,360 +427,16 @@ export class CesiumViewer extends LitElement {
           `
         : nothing}
       <!-- Entity detail popover -->
-      ${this._mapLoaded &&
-      this._popoverVisible &&
-      this._selectedEntity &&
-      this._selectedEntity.properties
-        ? html`
-            <div
-              id="popover"
-              style="left: ${this._popoverX}px; top: ${this._popoverY}px;"
-            >
-              <div id="popoverContainer">
-                <div class="popover-close">
-                  <div class="tooltip tooltip-left">
-                    <button
-                      type="button"
-                      @click=${(): void =>
-                        (this._viewer!.selectedEntity = undefined)}
-                    >
-                      X
-                    </button>
-                    <span class="tooltiptext">Close</span>
-                  </div>
-                </div>
-                <!-- Top row -->
-                <div class="popover-top-row">
-                  <div class="popover-logo-col">
-                    <img
-                      src=${this._selectedEntity.properties.logoImage}
-                      alt="${this._selectedEntity.properties.name} logo"
-                    />
-                  </div>
-                  <div class="popover-info-col">
-                    <h2>${this._selectedEntity.properties.name}</h2>
-                    <div class="tagline">
-                      ${this._selectedEntity.properties.description}
-                    </div>
-                  </div>
-                </div>
-                <!-- Tags -->
-                <div class="tags">
-                  ${this._selectedEntity.properties.batch.getValue()
-                    ? html` <span class="tag batch"
-                        >${this._selectedEntity.properties.batch}</span
-                      >`
-                    : nothing}
-                  ${this._selectedEntity.properties.status.getValue()
-                    ? html` <span class="tag status"
-                        >${this._selectedEntity.properties.status}</span
-                      >`
-                    : nothing}
-                  ${this._selectedEntity.properties.industry.getValue().length
-                    ? html` ${this._selectedEntity.properties.industry
-                        .getValue()
-                        .map((industry: string) => {
-                          return html` <span class="tag">${industry}</span>`;
-                        })}`
-                    : nothing}
-                </div>
-                <div class="row-divider"></div>
-                <!-- Company cta (links) -->
-                <div class="popover-company-cta-col">
-                  <a
-                    class="yc-company-page"
-                    href=${this._selectedEntity.properties.yc_page_url}
-                    target="_blank"
-                    >Company</a
-                  >
-                  <div class="company-page">
-                    ${this._selectedEntity.properties.company_pages
-                      .getValue()
-                      ?.filter(
-                        (item: WebPlatform) =>
-                          item.platform.toLowerCase() === 'company website'
-                      )
-                      .map(
-                        (item: WebPlatform) =>
-                          html`🔗&nbsp;
-                            <a
-                              class="website"
-                              href=${item.url}
-                              target="_blank"
-                              data-tooltip-content=${item.platform}
-                              aria-label=${item.platform}
-                            >
-                              ${item.url}
-                            </a>`
-                      ) ?? nothing}
-                  </div>
-                </div>
-                <div class="row-divider"></div>
-                <!-- About -->
-                <div class="popover-about-col truncate">
-                  ${this._selectedEntity.properties.about}
-                </div>
-                <!-- Founders -->
-                ${this._selectedEntity.properties.getValue().founders?.length
-                  ? html`
-                      <div class="founders-list">
-                        <h2 class="section-header-title">Founders</h2>
-                        ${this._selectedEntity.properties
-                          .getValue()
-                          .founders.map(
-                            (founder: Founder) => html`
-                              <!-- Founder card -->
-                              <div class="founder-card">
-                                <!-- Avatar -->
-                                <img
-                                  class="founder-avatar"
-                                  src=${`${!founder.has_placeholder_avatar ? new URL(`../assets/img/avatars/${founder.avatar}.png`, import.meta.url).href : founder.avatar}`}
-                                  alt="${founder.name}"
-                                />
-                                <!-- Info -->
-                                <div class="founder-info">
-                                  <div class="founder-header">
-                                    <!-- Name -->
-                                    <span class="founder-name"
-                                      >${founder.name}</span
-                                    >
-                                    <!-- Social profiles -->
-                                    ${founder.social_media_profiles.length
-                                      ? html`${founder.social_media_profiles.map(
-                                          (item: WebPlatform) => {
-                                            return html`
-                                              <div
-                                                class="tooltip tooltip-bottom"
-                                              >
-                                                <a
-                                                  href=${item.url}
-                                                  target="_blank"
-                                                  data-tooltip-content=${item.platform}
-                                                  aria-label=${item.platform}
-                                                >
-                                                  <img
-                                                    src=${SOCIAL_IMAGES[
-                                                      item.platform.toLowerCase()
-                                                    ]}
-                                                    alt="${item.platform} logo"
-                                                  />
-                                                </a>
-                                                <span class="tooltiptext"
-                                                  >${item.platform}</span
-                                                >
-                                              </div>
-                                            `;
-                                          }
-                                        )}`
-                                      : nothing}
-                                  </div>
-                                  <!-- Job title -->
-                                  <div class="founder-job-title">
-                                    ${founder.job_title}
-                                  </div>
-                                  <!-- Bio -->
-                                  ${founder.bio
-                                    ? html`<div class="founder-bio">
-                                        ${founder.bio}
-                                      </div>`
-                                    : nothing}
-                                </div>
-                              </div>
-                            `
-                          )}
-                      </div>
-                    `
-                  : nothing}
-                <!-- Company photos -->
-                <div class="company-photos">
-                  ${this._selectedEntity.properties.company_photos.getValue()
-                    .length
-                    ? html` <h2 class="section-header-title">Company Photos</h2>
-                        ${this._selectedEntity.properties.company_photos
-                          .getValue()
-                          .map((companyPhoto: string) => {
-                            return html`<img
-                              src=${new URL(
-                                `../assets/img/company_photos/${companyPhoto}.png`,
-                                import.meta.url
-                              ).href}
-                              alt="${this._selectedEntity?.properties
-                                ?.name} company photo"
-                            />`;
-                          })}`
-                    : nothing}
-                </div>
-                <!-- YC info card -->
-                <div class="yc-info-card">
-                  <div class="yc-company-logo">
-                    <a
-                      href=${this._selectedEntity.properties.yc_page_url}
-                      target="_blank"
-                    >
-                      <img
-                        src=${this._selectedEntity.properties.logoImage}
-                        alt="${this._selectedEntity.properties.name} logo"
-                      />
-                    </a>
-                  </div>
-                  <div class="yc-company-name">
-                    <a
-                      href=${this._selectedEntity.properties.yc_page_url}
-                      target="_blank"
-                      >${this._selectedEntity.properties.name}</a
-                    >
-                  </div>
-                  <!-- YC company details -->
-                  <div class="yc-company-details">
-                    <!-- Founded -->
-                    ${this._selectedEntity.properties.founded.getValue()
-                      ? html`<div class="detail-row">
-                          <span>Founded:</span
-                          ><span
-                            >${this._selectedEntity.properties.founded}</span
-                          >
-                        </div>`
-                      : nothing}
-                    <!-- Batch -->
-                    ${this._selectedEntity.properties.batch.getValue()
-                      ? html`<div class="detail-row">
-                          <span>Batch:</span
-                          ><span>${this._selectedEntity.properties.batch}</span>
-                        </div>`
-                      : nothing}
-                    <!-- Team size -->
-                    ${this._selectedEntity.properties.team_size.getValue()
-                      ? html`<div class="detail-row">
-                          <span>Team Size:</span
-                          ><span
-                            >${this._selectedEntity.properties.team_size}</span
-                          >
-                        </div>`
-                      : nothing}
-                    <!-- Status -->
-                    ${this._selectedEntity.properties.status.getValue()
-                      ? html`<div class="detail-row">
-                          <span>Status:</span>
-                          <span class="status"
-                            ><div class="status-dot"></div>
-                            ${this._selectedEntity.properties.status}</span
-                          >
-                        </div>`
-                      : nothing}
-                    <!-- Primary partner -->
-                    ${this._selectedEntity.properties.primary_partner.getValue()
-                      ? html`<div class="detail-row">
-                          <span>Primary Partner:</span
-                          ><a
-                            href=${`https://www.ycombinator.com/people/${this._selectedEntity.properties.primary_partner
-                              .getValue()
-                              .toLowerCase()
-                              .replace(' ', '-')}`}
-                            target="_blank"
-                            >${this._selectedEntity.properties
-                              .primary_partner}</a
-                          >
-                        </div>`
-                      : nothing}
-                    <!-- Location -->
-                    ${this._selectedEntity.properties.region.getValue()
-                      ? html`<div class="detail-row">
-                          <span>Location:</span
-                          ><span
-                            >${this._selectedEntity.properties.region}</span
-                          >
-                        </div>`
-                      : nothing}
-                    <!-- Latitude / Longitude -->
-                    ${this._selectedEntity.properties.hasLocation.getValue()
-                      ? html`<div class="detail-row">
-                          <span>Coordinates:</span
-                          ><span
-                            class="coords-detail-row-right-text detail-row-right-text"
-                            >${this._getEntityLatLon(
-                              this._selectedEntity
-                            )?.latitude.toFixed(6)}/${this._getEntityLatLon(
-                              this._selectedEntity
-                            )?.longitude.toFixed(6)}
-                          </span>
-                        </div>`
-                      : nothing}
-                    <!-- Address -->
-                    ${this._selectedEntity?.properties?.location?.getValue()
-                      ?.short_address
-                      ? html`<div class="detail-row">
-                          <span>Address:</span
-                          ><span class="detail-row-right-text">
-                            ${this._selectedEntity?.properties?.location?.getValue()
-                              ?.short_address}
-                          </span>
-                        </div>`
-                      : nothing}
-                  </div>
-                  ${this._selectedEntity.properties.company_pages.getValue()
-                    .length
-                    ? html`<div class="social-row">
-                        ${this._selectedEntity.properties.company_pages
-                          .getValue()
-                          .map((item: WebPlatform) => {
-                            return html`
-                              <div class="tooltip tooltip-bottom">
-                                <a
-                                  href=${item.url}
-                                  target="_blank"
-                                  data-tooltip-content=${item.platform}
-                                  aria-label=${item.platform}
-                                >
-                                  ${item.platform.toLowerCase() ===
-                                  'company website'
-                                    ? html` <img
-                                        src=${BROWSER_IMAGES[
-                                          appStore.userAgent
-                                        ]}
-                                        alt="${item.platform} logo"
-                                      />`
-                                    : html` <img
-                                        src=${SOCIAL_IMAGES[
-                                          item.platform.toLowerCase()
-                                        ]}
-                                        alt="${item.platform} logo"
-                                      />`}
-                                </a>
-                                <span class="tooltiptext"
-                                  >${item.platform}</span
-                                >
-                              </div>
-                            `;
-                          })}
-                      </div>`
-                    : nothing}
-                </div>
-              </div>
-            </div>
-          `
+      ${this._mapLoaded && this._popoverVisible
+        ? html`<cesium-entity-detail-popover
+            .popoverX=${this._popoverX}
+            .popoverY=${this._popoverY}
+            .selectedEntity=${this._selectedEntity}
+            @close-popover=${(): void =>
+              (this._viewer!.selectedEntity = undefined)}
+          ></cesium-entity-detail-popover>`
         : nothing}
     `;
-  }
-
-  /**
-   * Get latitude and longitude in degrees for a Cesium entity
-   * @param entity
-   */
-  private _getEntityLatLon(
-    entity: Cesium.Entity | undefined
-  ): { latitude: number; longitude: number } | undefined {
-    if (!entity || !entity?.position) return;
-
-    const position = entity.position.getValue(Cesium.JulianDate.now());
-    if (!position) return;
-
-    const cartographic = Cesium.Cartographic.fromCartesian(
-      position as Cesium.Cartesian3
-    );
-    return {
-      latitude: Cesium.Math.toDegrees(cartographic.latitude),
-      longitude: Cesium.Math.toDegrees(cartographic.longitude),
-    };
   }
 
   /** Load cesium (init map) */
@@ -1023,7 +661,7 @@ export class CesiumViewer extends LitElement {
         matchedEntity.properties.hasLocation.getValue() &&
         matchedEntity.position
       ) {
-        const entityCoords = this._getEntityLatLon(matchedEntity);
+        const entityCoords = getEntityLatLon(matchedEntity);
         latitude = entityCoords?.latitude;
         longitude = entityCoords?.longitude;
         message = `Fly to ${matchedEntity.name} (entity) successfully!`;
@@ -1064,7 +702,15 @@ export class CesiumViewer extends LitElement {
    */
   private _onFlyToEntity(event: CustomEvent): void {
     const entityId = event.detail;
-    if (!entityId || isNaN(entityId)) return;
+    if (!entityId || isNaN(entityId)) {
+      toast.show(
+        'Unable to preform action. Please try again.',
+        undefined,
+        'error',
+        DEFAULT_TOAST_POSITION
+      );
+      return;
+    }
 
     const entitiesArray = Array.from(this._viewer?.entities.values || []);
     const matchedEntity = entitiesArray.find(
@@ -1077,7 +723,7 @@ export class CesiumViewer extends LitElement {
       matchedEntity.properties.hasLocation.getValue() &&
       matchedEntity.position
     ) {
-      const entityCoords = this._getEntityLatLon(matchedEntity);
+      const entityCoords = getEntityLatLon(matchedEntity);
       this._viewer!.selectedEntity = undefined;
       this._flyTo(
         entityCoords?.longitude as number,
@@ -1101,6 +747,40 @@ export class CesiumViewer extends LitElement {
     } else {
       toast.show(
         'Entity not found on the map. Please try again.',
+        undefined,
+        'error',
+        DEFAULT_TOAST_POSITION
+      );
+      return;
+    }
+  }
+
+  /**
+   * Handle `show-entity-detail-popover` event
+   * @param event
+   */
+  private _onShowEntityItemDetailPopover(event: CustomEvent): void {
+    const entityId = event.detail;
+    if (!entityId || isNaN(entityId)) {
+      toast.show(
+        'Unable to preform action. Please try again.',
+        undefined,
+        'error',
+        DEFAULT_TOAST_POSITION
+      );
+      return;
+    }
+
+    const entitiesArray = Array.from(this._viewer?.entities.values || []);
+    const matchedEntity = entitiesArray.find(
+      (entity) => entity.id === String(entityId)
+    );
+
+    if (matchedEntity && matchedEntity.properties) {
+      this._viewer!.selectedEntity = matchedEntity;
+    } else {
+      toast.show(
+        'Unable to display entity detail.',
         undefined,
         'error',
         DEFAULT_TOAST_POSITION
@@ -1319,392 +999,6 @@ export class CesiumViewer extends LitElement {
         background: #268bd2ff;
       }
 
-      /* Popover */
-
-      #popover {
-        position: fixed;
-        max-width: 500px;
-        max-height: 400px;
-        overflow-y: auto;
-        background: var(--offWhite);
-        color: var(--black);
-        padding: 12px;
-        border-radius: 10px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-      }
-
-      #popoverContainer {
-        display: flex;
-        flex-direction: column;
-        border-radius: 12px;
-        padding: 16px;
-        width: 100%;
-        box-sizing: border-box;
-      }
-
-      .popover-close {
-        position: absolute;
-        top: 0.5rem;
-        right: 0.5rem;
-        background: transparent;
-        font-size: 1.25rem;
-        line-height: 1;
-      }
-
-      .popover-close button {
-        color: red;
-        background-color: transparent;
-        border: none;
-        cursor: pointer;
-        font-weight: bold;
-      }
-
-      .popover-close button:hover {
-        opacity: 0.75;
-      }
-
-      .popover-top-row {
-        display: flex;
-        align-items: flex-start;
-        margin-bottom: 12px;
-      }
-
-      .popover-logo-col {
-        flex-shrink: 0;
-        margin-right: 20px;
-        align-self: center;
-      }
-
-      .popover-logo-col img {
-        width: 80px;
-        height: 80px;
-        border-radius: 8px;
-        object-fit: contain;
-      }
-
-      .popover-info-col {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-      }
-
-      .popover-company-cta-col {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      a.yc-company-page {
-        text-decoration: none;
-        color: #333;
-        font-weight: bold;
-        font-size: 0.85rem;
-        padding: 6px;
-      }
-
-      a.yc-company-page:hover {
-        background: #edebe3;
-        border-radius: 6px;
-      }
-
-      .company-page {
-        margin-left: auto;
-        display: flex;
-        align-self: center;
-      }
-
-      .company-page a {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 1.5rem;
-        text-decoration: none;
-        color: #268bd2ff;
-      }
-
-      .company-page a:hover {
-        text-decoration: underline;
-      }
-
-      .popover-about-col {
-        font-size: 0.95rem;
-        line-height: 1.4;
-        color: #444;
-      }
-
-      /** Founder list and card */
-
-      .founders-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .founder-card {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 12px;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        background: #fff;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      }
-
-      .founder-avatar {
-        width: 64px;
-        height: 64px;
-        border-radius: 8px;
-        object-fit: cover;
-      }
-
-      .founder-info {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-      }
-
-      .founder-info a {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 1.5rem;
-        width: 1.5rem;
-        border-radius: 0.375rem;
-        transition: background 0.2s;
-      }
-
-      .founder-info a:hover {
-        background-color: #e5e7eb;
-      }
-
-      .founder-info a > img {
-        height: 1rem;
-        width: 1rem;
-      }
-
-      .founder-info a[aria-label='LinkedIn'] > img {
-        height: 1.25rem;
-        width: 1.25rem;
-      }
-
-      .founder-header {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .founder-name {
-        font-weight: bold;
-        font-size: 16px;
-        color: #111;
-      }
-
-      .founder-job-title {
-        font-size: 14px;
-        color: #555;
-        margin-bottom: 6px;
-      }
-
-      .founder-bio {
-        font-size: 14px;
-        line-height: 1.4;
-        color: #333;
-      }
-
-      /* Company photos */
-
-      .company-photos {
-        display: flex;
-        flex-direction: column;
-        gap: 0.8rem;
-      }
-
-      .company-photos img {
-        border-radius: 8px;
-      }
-
-      /* YC info card */
-
-      .yc-info-card {
-        display: flex;
-        flex-direction: column;
-        padding: 16px;
-        margin-top: 29px;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        background: #fff;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-      }
-
-      .yc-company-logo {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-
-      .yc-company-logo img {
-        max-width: 100px;
-        height: auto;
-        border-radius: 8px;
-      }
-
-      .yc-company-logo img:hover {
-        opacity: 0.93;
-      }
-
-      .yc-company-name {
-        font-size: 1.25rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-      }
-
-      .yc-company-name a {
-        font-weight: 700;
-        font-size: 1.25rem;
-        line-height: 1.75rem;
-        text-decoration: none;
-        color: #333;
-      }
-
-      .yc-company-name a:hover {
-        color: rgb(38 139 210);
-      }
-
-      .yc-company-details {
-        padding-top: 1rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-
-      .detail-row {
-        display: flex;
-        justify-content: space-between;
-      }
-
-      .social-row {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        align-items: center;
-        margin-top: 0.5em;
-      }
-
-      .social-row a {
-        display: flex;
-        height: 2.25rem;
-        width: 2.25rem;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.375rem;
-        border: 1px solid #ebebeb;
-        background-color: #fff;
-        transition: background-color 150ms;
-      }
-
-      .social-row a:hover {
-        background-color: #f9fafb;
-      }
-
-      .social-row a img {
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-      }
-
-      .detail-row a {
-        text-decoration: none;
-        color: #268bd2ff;
-      }
-
-      .detail-row a:hover {
-        text-decoration: underline;
-      }
-
-      .status {
-        display: flex;
-        align-items: center;
-      }
-
-      .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #22c55e;
-        margin-right: 6px;
-      }
-
-      /** Tags */
-
-      .tagline {
-        font-size: 1.1rem;
-        margin: 6px 0 14px;
-        color: #333;
-      }
-
-      .tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin: 8px 0 12px;
-      }
-
-      .tag {
-        background: #e6e4dc;
-        border-radius: 6px;
-        padding: 4px 10px;
-        font-size: 0.85rem;
-        letter-spacing: 0.05em;
-        font-weight: 100;
-        text-transform: uppercase;
-      }
-
-      .tag.batch {
-        background: #fff0e6;
-        color: #e65100;
-        display: flex;
-        align-items: center;
-      }
-
-      .tag.batch::before {
-        content: 'Y';
-        font-weight: bold;
-        margin-right: 6px;
-        background: #ff6d00;
-        color: white;
-        font-size: 0.7rem;
-        padding: 2px 4px;
-        border-radius: 3px;
-      }
-
-      .tag.status {
-        display: flex;
-        align-items: center;
-      }
-
-      .tag.status::before {
-        content: '';
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        background: #00c389;
-        border-radius: 50%;
-        margin-right: 6px;
-      }
-
-      .detail-row-right-text {
-        text-align: right;
-      }
-
-      .section-header-title {
-        margin-top: 1rem;
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #333333;
-      }
-
       h2 {
         margin: 0;
         font-size: 1.6rem;
@@ -1726,15 +1020,6 @@ export class CesiumViewer extends LitElement {
       @media only screen and (max-width: 640px) {
         .search-bar input {
           width: 150px;
-        }
-
-        #popover {
-          max-width: 90%;
-          transform: translateX(2.3%);
-        }
-
-        .coords-detail-row-right-text {
-          word-break: break-all;
         }
       }
     `,
