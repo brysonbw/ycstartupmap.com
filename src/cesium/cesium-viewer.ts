@@ -9,6 +9,7 @@ import { toast } from 'lit-toaster';
 import { tooltipStyles } from '../shared/styles/tooltipStyles';
 import { truncateTextStyles } from '../shared/styles/truncateTextStyles';
 import { rowDividerStyles } from '../shared/styles/dividerStyles';
+import { cesiumOverlayStyles } from './styles/cesiumOverlayStyles';
 import {
   CESIUM_VIEWER_EVENT,
   DEFAULT_BILLBOARD_IMAGE_SIZE,
@@ -36,28 +37,30 @@ import seamonkey from '../assets/img/browsers/seamonkey.png';
 import unknown from '../assets/img/browsers/unknown.png';
 
 import ycCompaniesData from '../data/yc_companies.json';
+
 import '../shared/loading-indicator';
+import './cesium-overlay';
 
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 
 const SOCIAL_IMAGES: Readonly<Record<string, string>> = Object.freeze({
-  crunchbase: crunchbase,
-  facebook: facebook,
-  github: github,
-  linkedin: linkedin,
-  x: x,
+  crunchbase,
+  facebook,
+  github,
+  linkedin,
+  x,
 });
 
 const BROWSER_IMAGES: Readonly<Record<UserAgent, string>> = Object.freeze({
-  chrome: chrome,
-  chromium: chromium,
-  edge: edge,
-  firefox: firefox,
-  opera: opera,
-  safari: safari,
-  seamonkey: seamonkey,
-  unknown: unknown,
+  chrome,
+  chromium,
+  edge,
+  firefox,
+  opera,
+  safari,
+  seamonkey,
+  unknown,
 });
 
 @customElement('cesium-viewer')
@@ -322,118 +325,123 @@ export class CesiumViewer extends LitElement {
           ]}</span
         >
       </loading-indicator>
-      <!-- Overlays -->
+      <!-- Cesium Overlay -->
       ${this._mapLoaded && this._showMapOverlays
         ? html`
-            <!-- Top left -->
-            ${this._showSearchBar
-              ? html`<div class="overlay-top-left-container">
-                  <form @submit=${this._onSearchSubmit} class="search-wrapper">
-                    <div class="search-bar">
-                      <input
-                        id="search"
-                        .value=${this._search}
-                        @input=${this._onSearchChange}
-                        type="text"
-                        placeholder="Search and fly to..."
-                      />
-                      <button type="submit">🔍</button>
+            <cesium-overlay>
+              ${this._showSearchBar
+                ? html`
+                    <div slot="overlay-top-left">
+                      <form
+                        @submit=${this._onSearchSubmit}
+                        class="search-wrapper"
+                      >
+                        <div class="search-bar">
+                          <input
+                            id="search"
+                            .value=${this._search}
+                            @input=${this._onSearchChange}
+                            type="text"
+                            placeholder="Search and fly to..."
+                          />
+                          <button type="submit">🔍</button>
+                        </div>
+                      </form>
+                    </div></cesium-overlay
+                  >`
+                : nothing}
+              <div slot="overlay-top-right">
+                <div class="tooltip tooltip-left">
+                  <button
+                    type="button"
+                    @click=${(): Promise<boolean> =>
+                      this._flyTo(
+                        HOME_CAMERA_COORDINATES.longitude,
+                        HOME_CAMERA_COORDINATES.latitude,
+                        HOME_CAMERA_COORDINATES.height
+                      )}
+                  >
+                    🌍
+                  </button>
+                  <span class="tooltiptext">Reset Camera</span>
+                </div>
+                <div class="tooltip tooltip-left">
+                  <button
+                    type="button"
+                    @mousedown=${(): void => this._startZoom(1)}
+                    @mouseup=${(): void => this._stopZoom()}
+                    @mouseleave=${(): void => this._stopZoom()}
+                  >
+                    ➕
+                  </button>
+                  <span class="tooltiptext">Zoom In</span>
+                </div>
+                <div class="tooltip tooltip-left">
+                  <button
+                    type="button"
+                    @mousedown=${(): void => this._startZoom(-1)}
+                    @mouseup=${(): void => this._stopZoom()}
+                    @mouseleave=${(): void => this._stopZoom()}
+                  >
+                    ➖
+                  </button>
+                  <span class="tooltiptext">Zoom Out</span>
+                </div>
+              </div>
+              ${!this._fullScreen
+                ? html` <div slot="overlay-bottom-left">
+                    <div class="tooltip tooltip-right">
+                      <button
+                        type="button"
+                        @click=${(): void =>
+                          this._emitEvent(
+                            CESIUM_VIEWER_EVENT.MENU_VISIBILITY_CHANGE,
+                            (this._menuOpen = !this._menuOpen)
+                          )}
+                      >
+                        ${this._menuOpen ? '‹' : '›'}
+                      </button>
+                      <span class="tooltiptext"
+                        >${this._menuOpen ? 'Collapse menu' : 'Open menu'}</span
+                      >
                     </div>
-                  </form>
-                </div>`
-              : nothing}
-            <!-- Top right -->
-            <div class="overlay-top-right-container">
-              <div class="tooltip tooltip-left">
-                <button
-                  type="button"
-                  @click=${(): Promise<boolean> =>
-                    this._flyTo(
-                      HOME_CAMERA_COORDINATES.longitude,
-                      HOME_CAMERA_COORDINATES.latitude,
-                      HOME_CAMERA_COORDINATES.height
-                    )}
-                >
-                  🌍
-                </button>
-                <span class="tooltiptext">Reset Camera</span>
+                  </div>`
+                : nothing}
+              <div slot="overlay-bottom-right">
+                <div class="tooltip tooltip-left">
+                  <button
+                    @click=${(): void => {
+                      this._fullScreen = !this._fullScreen;
+                      this._emitEvent(
+                        CESIUM_VIEWER_EVENT.FULL_SCREEN_CHANGE,
+                        this._fullScreen
+                      );
+                      this._emitEvent(
+                        CESIUM_VIEWER_EVENT.MENU_VISIBILITY_CHANGE,
+                        !this._fullScreen
+                      );
+                      this._menuOpen = !this._fullScreen;
+                    }}
+                    type="button"
+                  >
+                    ${this._fullScreen
+                      ? html`<img
+                          src=${fullScreenExitIcon}
+                          alt="Exit full screen icon"
+                        />`
+                      : html`<img
+                          src=${fullScreenIcon}
+                          alt="Full screen icon"
+                        /> `}
+                  </button>
+                  <span class="tooltiptext">
+                    ${this._fullScreen
+                      ? 'Exit full screen'
+                      : 'Full Screen'}</span
+                  >
+                </div>
               </div>
-              <div class="tooltip tooltip-left">
-                <button
-                  type="button"
-                  @mousedown=${(): void => this._startZoom(1)}
-                  @mouseup=${(): void => this._stopZoom()}
-                  @mouseleave=${(): void => this._stopZoom()}
-                >
-                  ➕
-                </button>
-                <span class="tooltiptext">Zoom In</span>
-              </div>
-              <div class="tooltip tooltip-left">
-                <button
-                  type="button"
-                  @mousedown=${(): void => this._startZoom(-1)}
-                  @mouseup=${(): void => this._stopZoom()}
-                  @mouseleave=${(): void => this._stopZoom()}
-                >
-                  ➖
-                </button>
-                <span class="tooltiptext">Zoom Out</span>
-              </div>
-            </div>
-            <!-- Bottom left -->
-            ${!this._fullScreen
-              ? html` <div class="overlay-bottom-left-container">
-                  <div class="tooltip tooltip-right">
-                    <button
-                      type="button"
-                      @click=${(): void =>
-                        this._emitEvent(
-                          CESIUM_VIEWER_EVENT.MENU_VISIBILITY_CHANGE,
-                          (this._menuOpen = !this._menuOpen)
-                        )}
-                    >
-                      ${this._menuOpen ? '‹' : '›'}
-                    </button>
-                    <span class="tooltiptext"
-                      >${this._menuOpen ? 'Collapse menu' : 'Open menu'}</span
-                    >
-                  </div>
-                </div>`
-              : nothing}
-            <!-- Bottom right -->
-            <div class="overlay-bottom-right-container">
-              <div class="tooltip tooltip-left">
-                <button
-                  @click=${(): void => {
-                    this._fullScreen = !this._fullScreen;
-                    this._emitEvent(
-                      CESIUM_VIEWER_EVENT.FULL_SCREEN_CHANGE,
-                      this._fullScreen
-                    );
-                    this._emitEvent(
-                      CESIUM_VIEWER_EVENT.MENU_VISIBILITY_CHANGE,
-                      !this._fullScreen
-                    );
-                    this._menuOpen = !this._fullScreen;
-                  }}
-                  type="button"
-                >
-                  ${this._fullScreen
-                    ? html`<img
-                        src=${fullScreenExitIcon}
-                        alt="Exit full screen icon"
-                      />`
-                    : html`<img
-                        src=${fullScreenIcon}
-                        alt="Full screen icon"
-                      /> `}
-                </button>
-                <span class="tooltiptext">
-                  ${this._fullScreen ? 'Exit full screen' : 'Full Screen'}</span
-                >
-              </div>
-            </div>
+            </cesium-overlay>
           `
         : nothing}
       <!-- Entity detail popover -->
@@ -1238,6 +1246,7 @@ export class CesiumViewer extends LitElement {
     tooltipStyles,
     truncateTextStyles,
     rowDividerStyles,
+    cesiumOverlayStyles,
     css`
       :host {
         display: block;
@@ -1260,74 +1269,6 @@ export class CesiumViewer extends LitElement {
 
       .cesium-widget-credits {
         display: none !important;
-      }
-
-      .overlay-top-left-container {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .overlay-top-center-container {
-        position: absolute;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .overlay-top-right-container {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .overlay-bottom-left-container {
-        position: absolute;
-        bottom: 10px;
-        left: 10px;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .overlay-bottom-right-container {
-        position: absolute;
-        bottom: 10px;
-        right: 10px;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .overlay-top-right-container button,
-      .overlay-bottom-left-container button,
-      .overlay-bottom-right-container button {
-        background-color: var(--white);
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        cursor: pointer;
-        padding: 6px;
-        color: var(--black);
-        font-size: 16px;
-      }
-
-      .overlay-bottom-right-container button {
-        display: flex;
-        align-items: center;
       }
 
       /** Search bar */
