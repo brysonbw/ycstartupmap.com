@@ -39,5 +39,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Show release info
         run: |
-          echo "YC Startup Map v${{ steps.package-version.outputs.version }} published!"
+          echo "YC Startup Map v${{ steps.package-version.outputs.version }} released!"
 
