@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": ">=20",
-    "npm": ">=9.6.3",
+    "node": ">=22",
+    "npm": ">=10.9.3",
     "yarn": "please use npm",
     "pnpm": "please use npm"
   },
