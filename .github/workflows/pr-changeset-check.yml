@@ -1,0 +1,30 @@
+name: 'PR Changeset Check (Warning)'
+
+on: [pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  changeset-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            changeset:
+              - '.changeset/**'
+      - name: Warn about missing changeset
+        if: steps.filter.outputs.changeset == 'false'
+        run: |
+          echo "::warning ::🦋 Warning: No changeset changes were found for this PR."
+          echo "::warning ::Changesets describe the changes in your PR and help the release process generate version bumps and changelog entries."
+          echo "::warning ::If your PR requires a new release or changeset, please create a changeset by running: npm run changeset. Otherwise, ignore."
+          echo "::warning ::More info:"
+          echo "::warning ::- Introduction: https://github.com/changesets/changesets/blob/main/docs/intro-to-using-changesets.md"
+          echo "::warning ::- Detailed explanation: https://github.com/changesets/changesets/blob/main/docs/detailed-explanation.md"
+      - name: Changeset found
+        if: steps.filter.outputs.changeset == 'true'
+        run: |
+          echo "✅🦋 Changeset changes were found for this PR."
